@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- homework 16 build file
+-->
+<project name="hw16" default="exe" basedir="." xmlns:jacoco="antlib:org.jacoco.ant">
+	<!--Load environment variables and give them prefix "env." -->
+	<property environment="env"/>
+	<property name="path" value="edu.umb.cs.cs680.hw16"/>
+	<property name="ECLIPSE_HOME" value="${env.ECLIPSE_HOME}"/>
+	<property name="ANT_HOME" value="${env.ANT_HOME}"/>
+	<property name="JACOCO_HOME" value="${env.JACOCO_HOME}"/>
+	<property name="FINDBUGS_HOME" value="${env.FINDBUGS_HOME}"/>
+	<property name="PMD_HOME" value="${env.PMD_HOME}" />
+	<property name="target" value="1.6"/>
+    <property name="source" value="src"/>
+	<property name="classes" location="bin"/>
+	<property name="report.dir" location="test/report" />
+	<property name="exec.file" location="jacoco.exec"/>
+    <property name="report.pmd.dir" location="${report.dir}/pmd" />
+    <property name="report.jacoco.dir" location="${report.dir}/jacoco" />
+	<property name="report.findbugs.dir" location="${report.dir}/findbugs" />
+    <property name="report.junit.dir" value="${report.dir}/junit"/>
+	<property name="test.dir" location="test" />
+	<property name="test.src" location="test/src" />
+	<property name="test.classes" location="test/bin" />
+	<property name="lib" value="lib"/>
+
+	<path id="JUnit4.libraryclasspath">
+        <pathelement location="${ANT_HOME}/lib/junit-4.12.jar"/>
+        <pathelement location="${ANT_HOME}/lib/hamcrest-core-1.3.jar"/>
+		<pathelement location="${classes}"/>
+    </path>
+	
+	<path id="project.classpath">
+		<path refid="JUnit4.libraryclasspath"/>
+	</path>
+	
+	<path id="project.test.classpath">
+		<pathelement location="${test.classes}"/>
+		<path refid="JUnit4.libraryclasspath"/>
+	</path>
+	
+	<path id="pmd.classpath">
+        <pathelement location="${build}" />
+        <fileset dir="${PMD_HOME}/lib/">
+            <include name="*.jar" />
+        </fileset>
+    </path>
+	
+	<target name="clean">
+		<delete dir="${classes}"/>
+		<delete dir="${test.classes}"/>
+		<delete dir="${report.dir}"/>
+	</target>
+	
+	<!-- Initialize directories and create complied classes -->
+	<target name="init" description="create">
+		<mkdir dir="${classes}"/>
+		<mkdir dir="${test.classes}"/>
+		<mkdir dir="${report.dir}"/>
+		<mkdir dir="${report.junit.dir}"/>
+		<echo message="Compiling ${ant.project.name}: ${ant.file}"/>
+		<javac includeantruntime="false" srcdir="${source}" destdir="${classes}" debug="on">
+			<classpath refid="project.classpath"/>
+		</javac>
+		<echo message="Compiling ${ECLIPSE_HOME} and ${ANT_HOME}"/>
+		<javac includeantruntime="false" srcdir="${test.src}" destdir="${test.classes}" debug="on">
+			<classpath refid="JUnit4.libraryclasspath"/>
+		</javac>
+	</target>
+
+	
+	<!-- Compile the java files and execute-->
+	<target name="build" depends="init" description="Compile the java files and execute">
+	</target>
+	
+	<!-- Executes compiled main class -->
+	<target name="main" depends="build">
+		<echo message="Executing ${ant.project.name} "/>
+		<java classname="${path}.Main" failonerror="true" fork="yes">
+		            <classpath refid="project.classpath"/>
+		     </java>
+	</target>
+	
+	<target name="JunitTest" depends="build" description="Run test using JUnit">
+        <junit fork="true" printsummary="on" haltonfailure="no">
+            <formatter type="xml"/>
+            <classpath refid="project.test.classpath"/>
+        	<classpath>
+        		<pathelement location="${test.classes}"/>
+        	</classpath>
+        	<formatter type="xml" />
+            <batchtest todir="${report.junit.dir}"> 
+                <fileset dir="${test.src}"> 
+                    <include name="**/*Test*.java" /> 
+                </fileset> 
+            </batchtest>
+        </junit>
+    </target>
+	
+	<target name="findbugs" description="Run code analysis over code to check for problems.">
+        <!-- Fail this target if FindBugs is not installed. -->
+        <available file="${FINDBUGS_HOME}/lib/findbugs.jar" property="findbugs.available" />
+        <fail unless="findbugs.available" message="Error: FINDBUGS_HOME not set or findbugs.jar not found."/>
+        <taskdef name="findbugs" classname="edu.umd.cs.findbugs.anttask.FindBugsTask" classpath="${FINDBUGS_HOME}/lib/findbugs-ant.jar"/>
+		<!-- Run FindBugs. -->
+		<mkdir dir="${report.findbugs.dir}" />
+		<findbugs home="${FINDBUGS_HOME}" workHard="true" output="xml:withMessages" outputFile="${report.findbugs.dir}/findbugs.xml">
+		     <class location="${classes}" />
+            <auxClasspath>
+                <fileset file="${ECLIPSE_HOME}/plugins/org.junit_4.12.0.v201504281640/junit.jar" />
+            </auxClasspath>
+        </findbugs>
+	</target>
+		
+	<target name="findbugs_html" description="Generate a report on error analysis." depends="findbugs">
+        <xslt in="${report.findbugs.dir}/findbugs.xml"
+              style="${FINDBUGS_HOME}/src/xsl/fancy.xsl"
+              out="${report.findbugs.dir}/findbugs-default.html" />
+    </target>
+	
+	<!-- PMD -->
+	<taskdef name="pmd" classname="net.sourceforge.pmd.ant.PMDTask" 
+             classpathref="pmd.classpath" />
+    <target name="report.pmd" description="Run code analysis over code to check for problems and report">
+        <mkdir dir="${report.pmd.dir}" />
+        <pmd rulesetfiles="rulesets/java/design.xml">
+            <formatter type="html" toFile="${report.pmd.dir}/pmd_report.html" />
+            <fileset dir="${source}">
+                <include name="**/*.java" />
+            </fileset>
+        </pmd>        
+    </target>
+	
+	<!-- JACOCO Task -->
+	<taskdef uri="antlib:org.jacoco.ant" resource="org/jacoco/ant/antlib.xml">
+        <classpath path="${JACOCO_HOME}/lib/jacocoant.jar"/>
+    </taskdef>
+
+	
+	<target name="exe"
+	            description="execute the build"
+	            depends="clean,init,main,JunitTest,findbugs_html,report.pmd" >
+	                
+	    </target>
+
+	
+</project>
